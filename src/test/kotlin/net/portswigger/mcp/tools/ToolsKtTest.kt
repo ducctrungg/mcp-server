@@ -21,8 +21,10 @@ import burp.api.montoya.utilities.Utilities
 import io.mockk.*
 import java.net.InetAddress
 import java.time.ZonedDateTime
+import java.util.Base64
 import java.util.Optional
 import io.modelcontextprotocol.kotlin.sdk.types.CallToolResult
+import io.modelcontextprotocol.kotlin.sdk.types.ImageContent
 import io.modelcontextprotocol.kotlin.sdk.types.TextContent
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
@@ -42,6 +44,9 @@ import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
 import java.net.ServerSocket
+import java.awt.Frame
+import java.awt.image.BufferedImage
+import javax.swing.JPanel
 import javax.swing.JTextArea
 
 class ToolsKtTest {
@@ -1053,6 +1058,108 @@ class ToolsKtTest {
                 delay(100)
                 result.expectTextContent("No interactions detected")
             }
+        }
+    }
+
+    @Nested
+    inner class ScreenshotTests {
+        private val frame = mockk<Frame>()
+
+        @BeforeEach
+        fun setupScreenshotMocks() {
+            mockkStatic("net.portswigger.mcp.tools.ScreenshotsKt")
+
+            every { api.userInterface().swingUtils().suiteFrame() } returns frame
+        }
+
+        @AfterEach
+        fun cleanupScreenshotMocks() {
+            unmockkStatic("net.portswigger.mcp.tools.ScreenshotsKt")
+        }
+
+        @Test
+        fun `capture screenshot should return a png image content block`() {
+            every { captureComponent(any()) } returns BufferedImage(4, 4, BufferedImage.TYPE_INT_ARGB)
+
+            runBlocking {
+                val result = client.callTool("capture_screenshot", emptyMap())
+
+                delay(100)
+                assertNotNull(result)
+                val content = result!!.content
+                assertEquals(1, content.size)
+
+                val image = content.first() as? ImageContent
+                assertNotNull(image, "Expected content to be ImageContent")
+                assertEquals("image/png", image!!.mimeType)
+
+                val bytes = Base64.getDecoder().decode(image.data)
+                assertTrue(
+                    bytes.size > 8 && bytes[0] == 0x89.toByte() && bytes[1] == 0x50.toByte() &&
+                        bytes[2] == 0x4E.toByte() && bytes[3] == 0x47.toByte(),
+                    "Expected PNG magic in returned data"
+                )
+            }
+
+            verify { captureComponent(frame) }
+        }
+
+        @Test
+        fun `capture screenshot should report when the window has no size`() {
+            every { captureComponent(any()) } returns null
+
+            runBlocking {
+                val result = client.callTool("capture_screenshot", emptyMap())
+
+                delay(100)
+                result.expectTextContent("<Burp window is not visible>")
+            }
+        }
+
+        @Test
+        fun `capture screenshot should be listed as a tool`() {
+            runBlocking {
+                val tools = client.listTools()
+                assertTrue(tools.any { it.name == "capture_screenshot" })
+            }
+        }
+
+        @Test
+        fun `capture screenshot should capture the requested tab contents`() {
+            val tabContent = JPanel()
+            every { selectTabByTitle(any(), any()) } returns tabContent
+            every { captureComponent(any()) } returns BufferedImage(4, 4, BufferedImage.TYPE_INT_ARGB)
+
+            runBlocking {
+                val result = client.callTool("capture_screenshot", mapOf("tab" to "screenshot-test"))
+
+                delay(100)
+                assertNotNull(result)
+                val content = result!!.content
+                assertEquals(1, content.size)
+
+                val image = content.first() as? ImageContent
+                assertNotNull(image, "Expected content to be ImageContent")
+                assertEquals("image/png", image!!.mimeType)
+            }
+
+            verify { selectTabByTitle(frame, "screenshot-test") }
+            verify { captureComponent(tabContent) }
+            verify(exactly = 0) { captureComponent(frame) }
+        }
+
+        @Test
+        fun `capture screenshot should report an unknown tab`() {
+            every { selectTabByTitle(any(), any()) } returns null
+
+            runBlocking {
+                val result = client.callTool("capture_screenshot", mapOf("tab" to "screenshot-test"))
+
+                delay(100)
+                result.expectTextContent("<No tab titled 'screenshot-test' found in the Burp window>")
+            }
+
+            verify(exactly = 0) { captureComponent(any()) }
         }
     }
 

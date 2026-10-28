@@ -12,8 +12,12 @@ import burp.api.montoya.http.message.requests.HttpRequest
 import io.modelcontextprotocol.kotlin.sdk.server.Server
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
+import io.modelcontextprotocol.kotlin.sdk.types.TextContent
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
+import net.portswigger.mcp.Swing
 import net.portswigger.mcp.config.McpConfig
 import net.portswigger.mcp.schema.encodeHistoryItem
 import net.portswigger.mcp.schema.toSerializableForm
@@ -388,6 +392,20 @@ fun Server.registerTools(api: MontoyaApi, config: McpConfig) {
 
         "Editor text has been set"
     }
+
+    mcpTool<CaptureScreenshot>(
+        "Captures a screenshot of Burp Suite and returns it as a PNG image. Without tab the whole window is captured. " +
+            "Pass tab (an exact tab title such as a Repeater tab name) to switch to that tab and capture only its " +
+            "contents, e.g. the request and response editors, without the tab strips and menus above."
+    ) {
+        val frame = api.userInterface().swingUtils().suiteFrame()
+        withContext(Dispatchers.Swing) {
+            val target = if (tab == null) frame else selectTabByTitle(frame, tab)
+                ?: return@withContext listOf(TextContent("<No tab titled '$tab' found in the Burp window>"))
+            captureComponent(target)?.let { listOf(it.toPngImageContent()) }
+                ?: listOf(TextContent("<Burp window is not visible>"))
+        }
+    }
 }
 
 fun getActiveEditor(api: MontoyaApi): JTextArea? {
@@ -489,6 +507,9 @@ data class SetProxyInterceptState(val intercepting: Boolean)
 
 @Serializable
 data class SetActiveEditorContents(val text: String)
+
+@Serializable
+class CaptureScreenshot(val tab: String? = null)
 
 @Serializable
 data class GetScannerIssues(override val count: Int, override val offset: Int) : Paginated
