@@ -106,11 +106,17 @@ The extension has an installer which will automatically configure the client set
 3. **Restart Claude Desktop** - assuming Burp is running with the extension loaded.
 
 ## Manual installations
-If you want to install the MCP server manually you can either use the extension's SSE server directly or the packaged
+If you want to install the MCP server manually you can either use the extension's HTTP server directly or the packaged
 Stdio proxy server.
 
+### Streamable HTTP MCP Server
+To use the Streamable HTTP transport, provide the configured server URL with the `/mcp` path to your MCP client:
+```
+http://127.0.0.1:9876/mcp
+```
+
 ### SSE MCP Server
-To use the SSE server directly, provide the configured server URL to your MCP client:
+To use the legacy SSE server directly, provide the configured server URL to your MCP client:
 ```
 http://127.0.0.1:9876
 ```

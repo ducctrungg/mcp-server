@@ -12,7 +12,9 @@ import io.modelcontextprotocol.kotlin.sdk.server.Server
 import io.modelcontextprotocol.kotlin.sdk.types.Implementation
 import io.modelcontextprotocol.kotlin.sdk.types.ServerCapabilities
 import io.modelcontextprotocol.kotlin.sdk.server.ServerOptions
+import io.ktor.server.routing.*
 import io.modelcontextprotocol.kotlin.sdk.server.mcp
+import io.modelcontextprotocol.kotlin.sdk.server.mcpStreamableHttp
 import net.portswigger.mcp.config.McpConfig
 import net.portswigger.mcp.tools.registerTools
 import java.net.URI
@@ -92,9 +94,9 @@ class KtorServerManager(private val api: MontoyaApi) : ServerManager {
                         call.response.header("Content-Security-Policy", "default-src 'none'")
                     }
 
-                    mcp {
-                        mcpServer
-                    }
+                    // Streamable HTTP at /mcp (installs SSE + content negotiation); legacy SSE stays at /.
+                    mcpStreamableHttp { mcpServer }
+                    routing { mcp { mcpServer } }
 
                     mcpServer.registerTools(api, config)
                 }.apply {

@@ -3,8 +3,13 @@ package net.portswigger.mcp
 import burp.api.montoya.MontoyaApi
 import burp.api.montoya.logging.Logging
 import burp.api.montoya.persistence.PersistedObject
+import io.ktor.client.*
+import io.ktor.client.plugins.sse.*
 import io.mockk.every
 import io.mockk.mockk
+import io.modelcontextprotocol.kotlin.sdk.client.Client
+import io.modelcontextprotocol.kotlin.sdk.client.StreamableHttpClientTransport
+import io.modelcontextprotocol.kotlin.sdk.types.Implementation
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
 import net.portswigger.mcp.config.McpConfig
@@ -90,6 +95,22 @@ class McpServerIntegrationTest {
             assertNotNull(pingResult, "Ping should return a result")
         } catch (e: Exception) {
             fail("Connection failed: ${e.message}")
+        }
+    }
+
+    @Test
+    fun `server should accept streamable http connections at mcp`() = runBlocking {
+        val httpClient = HttpClient { install(SSE) }
+        val mcp = Client(clientInfo = Implementation(name = "test-streamable-client", version = "1.0.0"))
+        try {
+            mcp.connect(StreamableHttpClientTransport(httpClient, "http://127.0.0.1:${testPort}/mcp"))
+
+            val toolNames = mcp.listTools().tools.map { it.name }
+            assertTrue(toolNames.contains("output_project_options"), "Server should have output_project_options tool")
+            assertNotNull(mcp.ping(), "Ping should return a result")
+        } finally {
+            mcp.close()
+            httpClient.close()
         }
     }
 }
