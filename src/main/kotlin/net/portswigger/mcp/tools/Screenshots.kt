@@ -41,22 +41,24 @@ internal fun BufferedImage.toPngImageContent(): ImageContent {
  */
 internal fun selectTabByTitle(root: Component?, title: String): Component? {
     val panes = mutableListOf<JTabbedPane>().also { collectTabbedPanes(root, it) }
-    val pane = panes.sortedByDescending { it.isShowing }.firstOrNull { selectIfMatches(it, title) } ?: return null
+    val changed = mutableListOf<JTabbedPane>()
+    val pane = panes.sortedByDescending { it.isShowing }
+        .firstOrNull { selectIfMatches(it, title, changed) } ?: return null
 
-    val touched = mutableListOf(pane)
     var child: Component = pane
     for (parent in generateSequence(pane.parent) { it.parent }) {
         if (parent is JTabbedPane) {
             val index = parent.indexOfComponent(child)
-            if (index >= 0) {
+            if (index >= 0 && parent.selectedIndex != index) {
                 parent.selectedIndex = index
-                touched.add(parent)
+                changed.add(parent)
             }
         }
         child = parent
     }
     // setSelectedIndex only revalidates lazily; a never-shown tab has no bounds until laid out.
-    touched.asReversed().forEach { it.invalidate(); it.validate() }
+    // Relayout only what changed: forcing it on an already-laid-out tree collapses Burp's split panes.
+    changed.asReversed().forEach { it.invalidate(); it.validate() }
     return pane.selectedComponent
 }
 
@@ -66,11 +68,14 @@ private fun collectTabbedPanes(component: Component?, out: MutableList<JTabbedPa
     if (component is Container) component.components.forEach { collectTabbedPanes(it, out) }
 }
 
-private fun selectIfMatches(pane: JTabbedPane, title: String): Boolean {
+private fun selectIfMatches(pane: JTabbedPane, title: String, changed: MutableList<JTabbedPane>): Boolean {
     val wanted = title.trim()
     for (i in 0 until pane.tabCount) {
         if (pane.getTitleAt(i)?.trim() == wanted || tabComponentText(pane.getTabComponentAt(i))?.trim() == wanted) {
-            pane.selectedIndex = i
+            if (pane.selectedIndex != i) {
+                pane.selectedIndex = i
+                changed.add(pane)
+            }
             return true
         }
     }

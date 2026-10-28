@@ -92,6 +92,22 @@ class ScreenshotsTest {
     }
 
     @Test
+    fun `selectTabByTitle should not relayout panes that already show the tab`() {
+        val beta = JPanel()
+        val pane = object : JTabbedPane() {
+            var validated = 0
+            override fun validate() { validated++; super.validate() }
+        }
+        pane.addTab("alpha", JPanel())
+        pane.addTab("beta", beta)
+        pane.selectedIndex = 1
+        pane.validated = 0
+
+        assertSame(beta, selectTabByTitle(pane, "beta"))
+        assertEquals(0, pane.validated)
+    }
+
+    @Test
     fun `selectTabByTitle should return null when nothing matches`() {
         val pane = JTabbedPane()
         pane.addTab("alpha", JPanel())
