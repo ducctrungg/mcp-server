@@ -9,6 +9,7 @@ import java.util.Base64
 import javax.imageio.ImageIO
 import javax.swing.JLabel
 import javax.swing.JTabbedPane
+import javax.swing.JSplitPane
 import javax.swing.JTable
 
 /**
@@ -93,11 +94,13 @@ private fun tabComponentText(component: Component?): String? {
 }
 
 /**
- * Selects the first row under [root] whose "#" column (first column when no such header) equals [id]
- * and scrolls it into view. Showing tables are searched before hidden ones. Must run on the EDT.
- * Returns false when no row matches, e.g. because the history filter hides it.
+ * Selects the first row under [root] whose "#" column (first column when no such header) equals [id],
+ * scrolls it into view, and returns the message editor area shown for that row: the other half of the
+ * nearest [JSplitPane] enclosing the table (the table itself when no split pane wraps it).
+ * Showing tables are searched before hidden ones. Must run on the EDT.
+ * Returns null when no row matches, e.g. because the history filter hides it.
  */
-internal fun selectTableRowById(root: Component?, id: Int): Boolean {
+internal fun selectTableRowById(root: Component?, id: Int): Component? {
     val tables = mutableListOf<JTable>().also { collectTables(root, it) }
     val wanted = id.toString()
     for (table in tables.sortedByDescending { it.isShowing }) {
@@ -106,11 +109,22 @@ internal fun selectTableRowById(root: Component?, id: Int): Boolean {
             if (table.getValueAt(row, column)?.toString()?.trim() == wanted) {
                 table.setRowSelectionInterval(row, row)
                 table.scrollRectToVisible(table.getCellRect(row, column, true))
-                return true
+                return editorPaneFor(table)
             }
         }
     }
-    return false
+    return null
+}
+
+private fun editorPaneFor(table: JTable): Component {
+    var child: Component = table
+    for (parent in generateSequence(table.parent) { it.parent }) {
+        if (parent is JSplitPane) {
+            return if (parent.leftComponent === child) parent.rightComponent else parent.leftComponent
+        }
+        child = parent
+    }
+    return table
 }
 
 private fun collectTables(component: Component?, out: MutableList<JTable>) {

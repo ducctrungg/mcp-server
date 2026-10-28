@@ -13,6 +13,7 @@ import java.util.Base64
 import javax.swing.JLabel
 import javax.swing.JPanel
 import javax.swing.JScrollPane
+import javax.swing.JSplitPane
 import javax.swing.JTabbedPane
 import javax.swing.JTable
 
@@ -118,13 +119,22 @@ class ScreenshotsTest {
     }
 
     @Test
-    fun `selectTableRowById should select the row whose hash column matches`() {
+    fun `selectTableRowById should select the row and return the editor half of the split pane`() {
         val table = JTable(arrayOf(arrayOf<Any>("x", 10), arrayOf<Any>("y", 2090)), arrayOf<Any>("Host", "#"))
-        val panel = JPanel().apply { add(JScrollPane(table)) }
+        val editors = JPanel()
+        val split = JSplitPane(JSplitPane.VERTICAL_SPLIT, JScrollPane(table), editors)
+        val panel = JPanel().apply { add(split) }
 
-        assertTrue(selectTableRowById(panel, 2090))
+        assertSame(editors, selectTableRowById(panel, 2090))
         assertEquals(1, table.selectedRow)
-        assertFalse(selectTableRowById(panel, 7))
+        assertNull(selectTableRowById(panel, 7))
         assertEquals(1, table.selectedRow)
+    }
+
+    @Test
+    fun `selectTableRowById should fall back to the table without a split pane`() {
+        val table = JTable(arrayOf(arrayOf<Any>(5)), arrayOf<Any>("#"))
+
+        assertSame(table, selectTableRowById(JPanel().apply { add(table) }, 5))
     }
 }

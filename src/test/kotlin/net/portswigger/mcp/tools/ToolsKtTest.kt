@@ -1165,8 +1165,9 @@ class ToolsKtTest {
         @Test
         fun `capture screenshot should select the proxy history row before capturing`() {
             val history = JPanel()
+            val editors = JPanel()
             every { selectTabByTitle(any(), any()) } returns history
-            every { selectTableRowById(any(), any()) } returns true
+            every { selectTableRowById(any(), any()) } returns editors
             every { captureComponent(any()) } returns BufferedImage(4, 4, BufferedImage.TYPE_INT_ARGB)
 
             runBlocking {
@@ -1178,13 +1179,14 @@ class ToolsKtTest {
 
             verify { selectTabByTitle(frame, "HTTP history") }
             verify { selectTableRowById(history, 2090) }
-            verify { captureComponent(history) }
+            verify { captureComponent(editors) }
+            verify(exactly = 0) { captureComponent(history) }
         }
 
         @Test
         fun `capture screenshot should report a missing proxy history row`() {
             every { selectTabByTitle(any(), any()) } returns JPanel()
-            every { selectTableRowById(any(), any()) } returns false
+            every { selectTableRowById(any(), any()) } returns null
 
             runBlocking {
                 val result = client.callTool("capture_screenshot", mapOf("proxyHistoryId" to 2090))

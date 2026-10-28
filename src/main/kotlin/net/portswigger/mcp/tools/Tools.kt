@@ -400,7 +400,7 @@ fun Server.registerTools(api: MontoyaApi, config: McpConfig) {
             "captured. Pass tab (an exact tab title such as a Repeater tab name) to switch to that tab and capture only " +
             "its contents, e.g. the request and response editors, without the tab strips and menus above. " +
             "Pass proxyHistoryId (the # column of the proxy HTTP history) to select that row in Proxy > HTTP history " +
-            "and capture it with its request and response; tab is ignored in that case."
+            "and capture only its request and response editors; tab is ignored in that case."
     ) {
         val frame = api.userInterface().swingUtils().suiteFrame()
         val target: Any = withContext(Dispatchers.Swing) {
@@ -408,10 +408,8 @@ fun Server.registerTools(api: MontoyaApi, config: McpConfig) {
                 proxyHistoryId != null -> {
                     val history = selectTabByTitle(frame, "HTTP history")
                         ?: return@withContext "<No 'HTTP history' tab found in the Burp window>"
-                    if (!selectTableRowById(history, proxyHistoryId)) {
-                        return@withContext "<No proxy history row #$proxyHistoryId is visible; check the history filter>"
-                    }
-                    history
+                    selectTableRowById(history, proxyHistoryId)
+                        ?: return@withContext "<No proxy history row #$proxyHistoryId is visible; check the history filter>"
                 }
                 tab != null -> selectTabByTitle(frame, tab)
                     ?: return@withContext "<No tab titled '$tab' found in the Burp window>"
