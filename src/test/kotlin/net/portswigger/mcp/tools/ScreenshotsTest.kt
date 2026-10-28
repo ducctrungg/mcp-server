@@ -1,6 +1,7 @@
 package net.portswigger.mcp.tools
 
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertSame
 import org.junit.jupiter.api.Assertions.assertNotNull
 import org.junit.jupiter.api.Assertions.assertNull
@@ -11,7 +12,9 @@ import java.awt.image.BufferedImage
 import java.util.Base64
 import javax.swing.JLabel
 import javax.swing.JPanel
+import javax.swing.JScrollPane
 import javax.swing.JTabbedPane
+import javax.swing.JTable
 
 class ScreenshotsTest {
 
@@ -96,5 +99,16 @@ class ScreenshotsTest {
         assertNull(selectTabByTitle(pane, "nope"))
         assertNull(selectTabByTitle(null, "alpha"))
         assertEquals(0, pane.selectedIndex)
+    }
+
+    @Test
+    fun `selectTableRowById should select the row whose hash column matches`() {
+        val table = JTable(arrayOf(arrayOf<Any>("x", 10), arrayOf<Any>("y", 2090)), arrayOf<Any>("Host", "#"))
+        val panel = JPanel().apply { add(JScrollPane(table)) }
+
+        assertTrue(selectTableRowById(panel, 2090))
+        assertEquals(1, table.selectedRow)
+        assertFalse(selectTableRowById(panel, 7))
+        assertEquals(1, table.selectedRow)
     }
 }

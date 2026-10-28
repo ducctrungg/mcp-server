@@ -14,6 +14,7 @@ import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import io.modelcontextprotocol.kotlin.sdk.types.TextContent
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
@@ -25,6 +26,7 @@ import net.portswigger.mcp.security.DataAccessSecurity
 import net.portswigger.mcp.security.DataAccessType
 import net.portswigger.mcp.security.HttpRequestSecurity
 import net.portswigger.mcp.security.filterConfigCredentials
+import java.awt.Component
 import java.awt.KeyboardFocusManager
 import java.util.regex.Pattern
 import javax.swing.JTextArea
@@ -394,15 +396,34 @@ fun Server.registerTools(api: MontoyaApi, config: McpConfig) {
     }
 
     mcpTool<CaptureScreenshot>(
-        "Captures a screenshot of Burp Suite and returns it as a PNG image. Without tab the whole window is captured. " +
-            "Pass tab (an exact tab title such as a Repeater tab name) to switch to that tab and capture only its " +
-            "contents, e.g. the request and response editors, without the tab strips and menus above."
+        "Captures a screenshot of Burp Suite and returns it as a PNG image. Without arguments the whole window is " +
+            "captured. Pass tab (an exact tab title such as a Repeater tab name) to switch to that tab and capture only " +
+            "its contents, e.g. the request and response editors, without the tab strips and menus above. " +
+            "Pass proxyHistoryId (the # column of the proxy HTTP history) to select that row in Proxy > HTTP history " +
+            "and capture it with its request and response; tab is ignored in that case."
     ) {
         val frame = api.userInterface().swingUtils().suiteFrame()
+        val target: Any = withContext(Dispatchers.Swing) {
+            when {
+                proxyHistoryId != null -> {
+                    val history = selectTabByTitle(frame, "HTTP history")
+                        ?: return@withContext "<No 'HTTP history' tab found in the Burp window>"
+                    if (!selectTableRowById(history, proxyHistoryId)) {
+                        return@withContext "<No proxy history row #$proxyHistoryId is visible; check the history filter>"
+                    }
+                    history
+                }
+                tab != null -> selectTabByTitle(frame, tab)
+                    ?: return@withContext "<No tab titled '$tab' found in the Burp window>"
+                else -> frame
+            }
+        }
+        if (target is String) return@mcpTool listOf(TextContent(target))
+        // Burp fills the history editors asynchronously after a row selection; give them a moment before painting.
+        // ponytail: fixed delay; poll the editor text if it ever proves too short.
+        if (proxyHistoryId != null) delay(500)
         withContext(Dispatchers.Swing) {
-            val target = if (tab == null) frame else selectTabByTitle(frame, tab)
-                ?: return@withContext listOf(TextContent("<No tab titled '$tab' found in the Burp window>"))
-            captureComponent(target)?.let { listOf(it.toPngImageContent()) }
+            captureComponent(target as Component)?.let { listOf(it.toPngImageContent()) }
                 ?: listOf(TextContent("<Burp window is not visible>"))
         }
     }
@@ -509,7 +530,7 @@ data class SetProxyInterceptState(val intercepting: Boolean)
 data class SetActiveEditorContents(val text: String)
 
 @Serializable
-class CaptureScreenshot(val tab: String? = null)
+class CaptureScreenshot(val tab: String? = null, val proxyHistoryId: Int? = null)
 
 @Serializable
 data class GetScannerIssues(override val count: Int, override val offset: Int) : Paginated

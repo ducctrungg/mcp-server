@@ -9,6 +9,7 @@ import java.util.Base64
 import javax.imageio.ImageIO
 import javax.swing.JLabel
 import javax.swing.JTabbedPane
+import javax.swing.JTable
 
 /**
  * Paints [component] (border and children included) into an offscreen image.
@@ -84,4 +85,31 @@ private fun tabComponentText(component: Component?): String? {
         }
     }
     return null
+}
+
+/**
+ * Selects the first row under [root] whose "#" column (first column when no such header) equals [id]
+ * and scrolls it into view. Showing tables are searched before hidden ones. Must run on the EDT.
+ * Returns false when no row matches, e.g. because the history filter hides it.
+ */
+internal fun selectTableRowById(root: Component?, id: Int): Boolean {
+    val tables = mutableListOf<JTable>().also { collectTables(root, it) }
+    val wanted = id.toString()
+    for (table in tables.sortedByDescending { it.isShowing }) {
+        val column = (0 until table.columnCount).firstOrNull { table.getColumnName(it).trim() == "#" } ?: 0
+        for (row in 0 until table.rowCount) {
+            if (table.getValueAt(row, column)?.toString()?.trim() == wanted) {
+                table.setRowSelectionInterval(row, row)
+                table.scrollRectToVisible(table.getCellRect(row, column, true))
+                return true
+            }
+        }
+    }
+    return false
+}
+
+private fun collectTables(component: Component?, out: MutableList<JTable>) {
+    if (component == null) return
+    if (component is JTable) out.add(component)
+    if (component is Container) component.components.forEach { collectTables(it, out) }
 }

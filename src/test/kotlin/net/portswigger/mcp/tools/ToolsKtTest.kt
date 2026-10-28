@@ -1161,6 +1161,40 @@ class ToolsKtTest {
 
             verify(exactly = 0) { captureComponent(any()) }
         }
+
+        @Test
+        fun `capture screenshot should select the proxy history row before capturing`() {
+            val history = JPanel()
+            every { selectTabByTitle(any(), any()) } returns history
+            every { selectTableRowById(any(), any()) } returns true
+            every { captureComponent(any()) } returns BufferedImage(4, 4, BufferedImage.TYPE_INT_ARGB)
+
+            runBlocking {
+                val result = client.callTool("capture_screenshot", mapOf("proxyHistoryId" to 2090))
+
+                delay(100)
+                assertTrue(result!!.content.first() is ImageContent)
+            }
+
+            verify { selectTabByTitle(frame, "HTTP history") }
+            verify { selectTableRowById(history, 2090) }
+            verify { captureComponent(history) }
+        }
+
+        @Test
+        fun `capture screenshot should report a missing proxy history row`() {
+            every { selectTabByTitle(any(), any()) } returns JPanel()
+            every { selectTableRowById(any(), any()) } returns false
+
+            runBlocking {
+                val result = client.callTool("capture_screenshot", mapOf("proxyHistoryId" to 2090))
+
+                delay(100)
+                result.expectTextContent("<No proxy history row #2090 is visible; check the history filter>")
+            }
+
+            verify(exactly = 0) { captureComponent(any()) }
+        }
     }
 
     @Test
